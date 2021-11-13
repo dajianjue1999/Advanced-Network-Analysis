@@ -1,0 +1,102 @@
+---
+title: "Senate"
+author: "Daoyang E"
+date: "11/13/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Import packages
+library(statnet)
+```
+
+
+```{r}
+# Import and clean up datasets
+senate <- read.csv("Senate.csv", header = T)
+att <- read.csv("att.csv", header = T)
+att["Gender"] <- as.character(ifelse(att["Gender"]=="M","Male","Female"))
+att["Race"] <- as.character(ifelse(att["Race"]=="W","White","Non-White"))
+```
+
+
+```{r}
+# Create a network for senators and set attributes
+net <- network(senate, directed = F)
+set.vertex.attribute(net, "party", att$Party)
+set.vertex.attribute(net, "state", att$State)
+set.vertex.attribute(net, "firstyear", att$FirstYear)
+set.vertex.attribute(net, "tenure", att$Tenure)
+set.vertex.attribute(net, "age", att$Age)
+set.vertex.attribute(net, "race", att$Race)
+set.vertex.attribute(net, "gender", att$Gender)
+set.vertex.attribute(net, "education", att$Education)
+```
+
+
+
+
+```{r}
+
+# Plot the network
+png("Senate.png", width = 2000, height = 2000, res=35)
+plot.network(net, displaylabels = T, boxed.labels = FALSE, vertex.cex = 0.6, label.cex = 5, 
+             vertex.col = ifelse(att$Party=="I", "purple", ifelse(att$Party=="D", "blue", "red")), 
+             label.col = ifelse(att$FirstYear=="1", "brown", "black"), edge.lwd = 0.3, edge.col = "gray50")
+dev.off()
+```
+
+
+```{r}
+# Node level measures
+degree <- degree(net)
+closeness <- closeness(net, cmode="suminvdir")
+betweenness <- betweenness(net)
+ecent <- evcent(net)
+table1 <- cbind(degree, closeness, betweenness, ecent)
+```
+
+
+```{r}
+# Group level measures
+clique <- clique.census(net)
+table2 <- as.matrix(clique$clique.count[,1])
+colnames(table2) <- c("# of cliques")
+```
+
+
+```{r}
+# Network level measures
+density <- gden(net)
+centrality <- centralization(net, degree)
+transitivity <- gtrans(net)
+table3 <- cbind(density, centrality, transitivity)
+
+```
+
+
+```{r}
+# ERGM
+model <- ergm(net ~ edges + nodecov("age")+ nodecov("tenure")+ nodefactor("party") + 
+                nodefactor("gender")+ nodefactor("race") + nodefactor("education") + nodefactor("firstyear") +
+                absdiff("age") + absdiff("tenure") + nodematch("party")+ nodematch("state") + nodematch("gender")+
+                nodematch("race")+ nodematch("education")+ nodematch("firstyear")+
+                gwdegree(0.1, fixed = TRUE)+ gwesp(0.1, fixed = TRUE) + gwdsp(0.1, fixed = TRUE),
+              control = control.ergm(MCMLE.maxit = 300, MCMC.burnin=10000, MCMC.interval=200, seed = 123 ))
+summary(model)
+est <- as.matrix(summary(model)$coefs)[,c(1,2,4)]
+```
+
+
+```{r}
+
+gof <- gof(model)
+par(mfrow=c(1,4))
+plot(gof)
+```
+

@@ -1,0 +1,141 @@
+---
+title: "Ass5"
+author: "Daoyang E"
+date: "11/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(statnet)
+library(dplyr)
+library(sna)
+library(keyplayer)
+library(NbClust)
+```
+
+
+### 2.1
+
+```{r}
+data <- read.csv("Manager_friends.csv", header = T)
+friends <- as.matrix(data)
+
+data2 <- read.csv("Manager_advice.csv", header = T)
+advice <- as.matrix(data2)
+
+manager<- friends+advice
+
+#for (i in 1:21){
+#  for (j in 1:21){
+#    if(dat[i,j]==2)
+#      dat[i,j] = 1
+#  }
+#}
+
+### Convert to a manager network 
+#manager <- t(dat) %*% dat
+# Remove loops
+diag(manager)=0
+
+### Make a network
+net <- network(manager, matrix.type="adjacency", directed=T, ignore.eval=FALSE, names.eval="value")
+```
+
+
+### 2.2
+
+```{r}
+degree <- degree(net, ignore.eval=FALSE) #For binary networks, set ignore.eval=TRUE.
+closeness <- closeness(net, ignore.eval=FALSE, cmode="suminvundir")
+betweenness <- betweenness(net, ignore.eval=FALSE, cmode="undirected")
+ecent <- evcent(net, ignore.eval=FALSE)
+
+cbind(degree, closeness, betweenness, ecent)
+```
+
+### 2.3
+
+```{r}
+### Import the attributes for nodes
+att <- read.csv("Manager_att.csv", header = T, row.names = 1 )
+set.vertex.attribute(net, "age", att$age )
+set.vertex.attribute(net, "tenure", att$tenure )
+set.vertex.attribute(net, "level", att$level )
+set.vertex.attribute(net, "dept", att$dept )
+
+### Plot the network
+plot(net, displaylabels = T, edge.lwd=net%e%'value', vertex.col=att$dept)
+```
+
+### 2.4
+
+```{r results='hide'}
+model <- ergm(net~sum+nodecov("age")+nodecov("tenure")+nodefactor("level")+ nodefactor("dept")+nodematch("age")+nodematch("tenure")+nodematch("level")+nodematch("dept") +mutual +  transitiveweights, response="value", reference=~Poisson)
+```
+
+```{r}
+summary(model)
+```
+
+
+The average connection for a vice president is $e^{-0.151169}$ times the average connection for a CEO. The average connection for a manager is $e^{-0.57618}$ times the average connection for a CEO. The average connection for a person in department 2 is $e^{-0.0825}$  times the average connection for a person in department 1. The avergae connection between a person in department 3 and department 1 is $e^{0.1716}$  times the average connection for a person in department 1The average connection between manager with the same level is $e^{0.58227}$ times the average connection between manager with different level. The average connection between manager with the same department is $e^{0.189343}$ times the average connection between manager with different department. The mutuality between two managers is $e^{ 0.874967}$ times the average connection for asymmetrical ties between managers. The average connection between manager with the same age is $e^{0.50705}$ times the average connection between manager with different department.
+
+### 3.1
+
+```{r}
+deg <- degree(advice, cmode = "indegree")
+names(deg) <- seq(1,21,1)
+
+ids <- as.numeric(names(sort(deg, decreasing=T)[1:4]))
+ids
+
+kpcent(advice,ids,type="degree", cmode="indegree", method = "max")
+```
+
+the number of the managers with the highest individual indegree are number 2, 7, 18, 21. The unique incoming connections they have is 17.
+
+### 3.2
+
+```{r}
+kpset(advice,size=4,type="degree", cmode="indegree", method = "max")
+```
+
+the four managers with highest group indegree is 2, 7, 18, 21. And the total number of unique incoming connections they have is 17.
+
+### 3.3
+
+```{r}
+library(igraph)
+```
+
+
+```{r}
+Fnet <- graph.adjacency(advice)
+
+g <- edge.betweenness.community(Fnet)
+
+plot(as.dendrogram(g))
+```
+
+```{r}
+g$membership
+```
+
+```{r}
+V(Fnet)$color=g$membership
+
+plot(Fnet)
+```
+
+### 3.4
+
+```{r}
+set.seed(385)
+nc <- NbClust(advice, min.nc=2, max.nc=8, index = "kl", method="kmeans")
+nc
+```
+
+we see that, from this method, group 1, 2, 3 have rather good kmeans value.
+
+While the edge-removal methods only left us with one group, group 1, this difference might stem from the fact that edge-removal method is better for undirected network while manager advising network is a directed network.

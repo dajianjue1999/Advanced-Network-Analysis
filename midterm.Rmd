@@ -1,0 +1,208 @@
+---
+title: "midterm"
+author: "Daoyang E"
+date: "10/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(statnet)
+library(dplyr)
+```
+
+```{r}
+data <- read.csv("co-advising.csv", header = T)
+att <- read.csv("co-advising_att.csv", header = T)
+```
+
+```{r}
+Fnet <- network(data, directed = T)
+```
+
+
+### 1.1
+```{r}
+plot.network(Fnet, displaylabels = T, boxed.labels = FALSE, vertex.cex = 0.6, label.cex = 1, 
+             vertex.col = att$Rank, label.col = "blue", edge.lwd = .5, edge.col = "gray50")
+```
+
+### 1.2
+
+```{r}
+#node level
+degree <- degree(Fnet)
+ind <- degree(Fnet, cmode = "indegree")
+out <- degree(Fnet, cmode = "outdegree")
+```
+
+```{r}
+#closeness
+closeness <- closeness(Fnet, cmode="suminvdir")
+```
+
+```{r}
+#betweenness
+betweenness <- betweenness(Fnet)
+```
+
+```{r}
+#eigenvector centrality
+ecent <- evcent(Fnet)
+order(ecent)
+```
+
+```{r}
+tab1 <- cbind(degree, closeness, betweenness, ecent)
+#table showing degree closeness betweenness and eigenvector centrality
+tab1
+```
+
+The table is shown above, and from the order of eigenvector centrality, we see that actor number 1, 14, 18 have the highest centrality.
+
+### 1.3
+
+```{r}
+att.new <- cbind(att[,2:5],degree)
+model1 <- lm(degree~., data = att.new)
+summary(model1)
+```
+
+We see that the linear regression by using att to predict degree centrality would have the form of $degree = -2.0648+7.0266*Rank-0.3360*Tenure-0.6125*Gender+3.3807*Quant$, notice that in these five attributes, only Rank and Tenure are statistically significant in estimating degree.
+
+### 1.4
+
+```{r}
+clique <- clique.census(Fnet)
+#clique of size 4
+clique$cliques[4]
+#clique of size 5
+clique$cliques[5]
+```
+
+### 1.5
+
+```{r, warning=FALSE}
+# density
+density <- gden(Fnet)
+density
+# centralization
+cent <- centralization(Fnet, degree)
+cent
+# transivity
+transitivity <- gtrans(Fnet)
+transitivity
+```
+
+### 1.6
+
+```{r}
+set.vertex.attribute( Fnet, "Rank", att$Rank )
+set.vertex.attribute( Fnet, "Tenure", att$Tenure )
+set.vertex.attribute( Fnet, "Gender", att$Gender )
+set.vertex.attribute( Fnet, "Quant", att$Quant )
+```
+
+```{r}
+# structual brokerage
+sb <- brokerage(Fnet, att$Rank)
+# Observed brokerage scores, by vertex. t column shows the total roles.
+tab2<-sb$raw.nli 
+tab2
+order(tab2[,6])
+```
+```{r}
+cor(tab2[,6], tab1[,3])
+```
+
+I see that the three actors that has the highest brokerage power would be actor 1, 17, 18. This brokerage index correlates strongly with betweenness centrality, with a correlation of `r cor(tab2[,6], tab1[,3])`.
+
+### 1.7
+
+```{r}
+# Structural equivalence
+se <- sedist (Fnet, method = "euclidean")
+se[upper.tri(se)] <- ""
+write.table(se, file = "SE.csv", sep =",", col.names = F, row.names = F)
+SE<-read.csv("sE.csv")
+SE
+```
+
+
+```{r}
+# Hierarchical clustering of network positions
+eq <- equiv.clust (Fnet, method="euclidean")
+
+plot(eq, main="Hierarchical clustering of network positions", xlab = "", sub="")
+```
+
+Structure equivalence is the notion that two nodes are structurally equivalent if they are connected to others in the similar manner. Here I use euclidean distance, which is difference in the ties of two actors, to measure structure equivalence.
+
+### 1.8
+
+```{r}
+block <- blockmodel(Fnet, eq, k = 3)
+tab3 <- block[[5]]
+```
+
+```{r}
+plot(block, displaylabels = F, xlab="", ylab="", main="Blockgrouping", sub="")
+```
+```{r}
+tab3
+```
+
+### 2.1
+
+```{r}
+ERGM1 <- ergm(Fnet ~ edges + nodecov("Tenure") + nodefactor("Quant") + nodefactor("Rank") + nodefactor("Gender") + absdiff("Tenure") + nodematch("Quant") + nodematch("Rank") + nodematch("Gender"))
+summary(ERGM1)
+est1 <- as.matrix(summary(ERGM1)$coefs)[,c(1,2,4)]
+est1
+```
+
+For the first ERGM model, I would like to covariate effects, which are main effects and homophily. For the main effects, I only have "Tenure" as a continuous variable, so I choose to estimate its connection effects, "Rank", "Quant" and "Gender" are categorical variables, so I try to estimate its node factors.
+Concerning the homophily, the idea is the same, I try to estimate the difference for continuous variables, in this case is "Tenure", and for the categorical variables, I would use matchment between nodes.
+
+### 2.2
+
+```{r}
+ERGM2 <- ergm(Fnet ~ edges + nodecov("Tenure") + nodefactor("Quant") + nodefactor("Rank") + nodefactor("Gender") +                 absdiff("Tenure") + nodematch("Quant") + nodematch("Rank") + nodematch("Gender")+
+               gwidegree(0.01, fixed = TRUE) + gwesp(0.01, fixed = TRUE) + gwdsp(0.01, fixed = TRUE), 
+               estimate = "MPLE", control = control.ergm(MCMLE.maxit = 300, MCMC.burnin = 10000, MCMC.interval = 200,                   seed = 2))
+summary(ERGM2)
+est2 <- as.matrix(summary(ERGM2)$coefs)[,c(1,2,4)]
+est2
+```
+
+I include three more terms to model endogenous tie formation process, gwidegree is the geometrically weighted in-degree distribution, which estimates the preferential attachment. gwesp is the geometrically weighted edgewise shared partner distribution and gwnsp is geometrically weighted nonedgewise shared partner distribution. These two terms combined is to estimate the transitivity.
+
+### 2.3
+
+```{r}
+#estimate for ERGM model1
+est1
+#estimate for ERGM model2
+est2
+```
+
+
+```{r}
+AIC <- rbind(AIC(ERGM1), AIC(ERGM2))
+AIC
+```
+
+Since smaller AIC means better, I would choose ERGM model2.
+
+```{r}
+gof2 <- gof(ERGM2)
+par(mfrow=c(1,5))
+plot(gof2)
+```
+
+The goodness-of-fit test indicates a result that although my model shows general convergence and performs relatively well for in degree, out degree and edge-wise shared partners, my model did not capture most of the features of the minimum geodesic distance, which is an indication that I need to further improve my model to fit the simulated model with the observed values.
+
+The results of the ERGM indicates that "Rank" covariate effect and "Quant" covariate effect has relative strong influence on co-advising network, same as homophily effect for "Quant". Oppositely, "Tenure" and "Gender" show little covariate effect in influencing advice seeking ties, same as homophily for "Tenure". There is indication that  transitivty has positive influence on co-advising network formation, but considering preferential attachment, the relation is negative.

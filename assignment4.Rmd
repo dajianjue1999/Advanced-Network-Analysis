@@ -1,0 +1,220 @@
+---
+title: "Assignment4"
+author: "Daoyang E"
+date: "10/19/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(RSiena)
+library(statnet)
+library(mvmeta)
+```
+
+### 1
+
+```{r}
+friend.data.w1 <- as.matrix(read.table("s50-network1.dat"))
+friend.data.w2 <- as.matrix(read.table("s50-network2.dat"))
+friend.data.w3 <- as.matrix(read.table("s50-network3.dat"))
+drink <- as.matrix(read.table("s50-alcohol.dat"))
+sport <- as.matrix(read.table("s50-sport.dat"))
+age <- as.matrix(read.csv("s50-age.csv", header = T))
+```
+
+```{r}
+net1 <- as.network(friend.data.w1)
+net2 <- as.network(friend.data.w2)
+net3 <- as.network(friend.data.w3)
+```
+
+```{r}
+friendship <- sienaNet(array( c( friend.data.w1, friend.data.w2, friend.data.w3 ), dim = c( 50, 50, 3 ) ) ) 
+```
+
+```{r}
+drinking <- sienaNet( drink, type = "behavior" )
+```
+
+```{r}
+sport <- varCovar( sport )
+```
+
+```{r}
+age <- coCovar( as.vector(age) )
+```
+
+```{r}
+mydata <- sienaDataCreate( friendship, drinking, sport, age )
+```
+
+```{r}
+myeff <- getEffects(mydata)
+```
+
+```{r}
+myeff <- includeEffects(myeff, egoX, altX, simX, interaction1="sport")
+myeff <- includeEffects(myeff, egoX, altX, simX, interaction1="age")
+```
+
+```{r}
+myeff <- includeEffects(myeff, transTrip, inPopSqrt, outPopSqrt)
+```
+
+```{r}
+myeff <- includeEffects(myeff, egoX, altX, simX, interaction1="drinking")
+```
+
+```{r}
+myeff <- includeInteraction( myeff, egoX, recip, interaction1 = "drinking" )
+```
+
+```{r}
+myeff <- includeInteraction( myeff, egoX, recip, interaction1 = "sport" )
+```
+
+```{r}
+myeff<-includeEffects(myeff, name="drinking", avAlt, indeg, outdeg, interaction1="friendship")
+```
+
+```{r}
+myeff<-includeEffects(myeff, name="drinking", effFrom, interaction1="sport")
+myeff<-includeEffects(myeff, name="drinking", effFrom, interaction1="age")
+```
+
+
+```{r echo = T, results = 'hide'}
+mymodel <- sienaModelCreate(useStdInits = TRUE, projname = 'drinking', n3 = 1000)
+
+ans1 <- siena07(mymodel, data=mydata, effects=myeff, silent = F, batch=TRUE, nbrNodes=2, useCluster=TRUE)
+
+```
+
+```{r}
+ans1
+```
+
+As we see from the result of the model, the model has two parts, one reflects network dynamics and the other drinking behavior dynamics. The model already converges, since we don't see many t ratios greater than 0.1
+
+### 2
+
+Concerning reciprocity, transitivity and preferential attachment, we will look at the terms of eval reciprocity, eval transitive triplets, eval indegree - popularity (sqrt) and eval outdegree - popularity (sqrt). Eval reciprocity has an estimated coefficient of 2.6735, which indicates a strong existence of reciprocity in friendship formation over time. Eval transitive triplets has a coefficient of 0.7276, which indicates a existence of transitivity in friendship formation over time. eval indegree and outdegree together form the preferential attachment effect, since one has a positive coefficient, there is evidence indicating the existence of preferential attachment in friendship formation over time.
+
+Looking at the coefficient of eval drinking alter, which is -0.0052, we understand that drinking actually reduce the ties received from others, meaning that the individual becomes less popular. Eval drinking similarity has a coefficient of 1.3474, which means that drinkers are very likely to become friends with other drinkers over time. Eval sport alter has a coefficient of 0.0649, which indicates a positive receiver effect, meaning that playing sports would become more popular. Eval sport similarity has a estimated coefficient of 0.1488, which indicates that sport players are that likely to become friends with each other.
+
+### 3
+
+I do find evidence for peer influence. Eval drinking average alter has a coefficient of 6.2214, which means that there exists a strong peer effect on behavior. The negative coefficient of eval drinking indegree means that there is a negative effect between ties received and drinking, which means that popular people is not likely to drink.
+
+The postive coefficient of eval drinking: effect from sport means that sport will have a postive influence on drinking, people who play sports are more likely to drink.
+
+### 4
+
+```{r}
+Drink <- read.table("s50-alcohol.dat")
+Sport <- read.table("s50-sport.dat")
+Age <- read.csv("s50-age.csv", header = T)
+```
+
+```{r}
+set.vertex.attribute( net1, "age", Age$age )
+set.vertex.attribute( net1, "drink", Drink$V1 )
+set.vertex.attribute( net1, "sport", Sport$V1 )
+```
+
+```{r}
+set.vertex.attribute( net2, "age", Age$age )
+set.vertex.attribute( net2, "drink", Drink$V2 )
+set.vertex.attribute( net2, "sport", Sport$V2 )
+```
+
+```{r}
+set.vertex.attribute( net3, "age", Age$age )
+set.vertex.attribute( net3, "drink", Drink$V3 )
+set.vertex.attribute( net3, "sport", Sport$V3 )
+```
+
+```{r}
+ERGM1 <- ergm(net1 ~ edges + nodeicov("age") + nodeocov("age") + nodefactor("sport") +
+                 nodefactor("drink") + absdiff("age") + nodematch("sport") + nodematch("drink"),
+               control = control.ergm(MCMLE.maxit = 30, MCMC.burnin=10000, MCMC.interval=200, seed = 651 ))
+summary(ERGM1)
+```
+
+```{r}
+ERGM2 <- ergm(net2 ~ edges + nodeicov("age") + nodeocov("age") + nodefactor("sport") +
+                 nodefactor("drink") + absdiff("age") + nodematch("sport") + nodematch("drink"),
+               control = control.ergm(MCMLE.maxit = 30, MCMC.burnin=10000, MCMC.interval=200, seed = 651 ))
+summary(ERGM2)
+```
+
+```{r}
+ERGM3 <- ergm(net3 ~ edges + nodeicov("age") + nodeocov("age") + nodefactor("sport") +
+                 nodefactor("drink") + absdiff("age") + nodematch("sport") + nodematch("drink"),
+               control = control.ergm(MCMLE.maxit = 30, MCMC.burnin=10000, MCMC.interval=200, seed = 651 ))
+summary(ERGM3)
+```
+
+```{r}
+est1 <- as.matrix(summary(ERGM1)$coefs)[,c(1,2)]
+cov1 <- as.matrix(ERGM1$covar)
+est2 <- as.matrix(summary(ERGM2)$coefs)[,c(1,2)]
+cov2 <- as.matrix(ERGM2$covar)
+est3 <- as.matrix(summary(ERGM3)$coefs)[,c(1,2)]
+cov3 <- as.matrix(ERGM3$covar)
+```
+
+```{r}
+est <- cbind(est1, est2, est3)
+theta <- est[,c(1,3,5)]
+var <- est[,c(2,4,6)]^2
+```
+
+```{r}
+## Fixed effects
+umeta <- list()
+K <- nrow(theta)
+tab <- NULL
+for (i in 1:K) {
+  umeta[[i]] <- mvmeta(theta[i,]~1, S=var[i,], method="fixed")
+  out <- summary(umeta[[i]])$coef[,c(1,2,4)]
+  tab <- rbind(tab, out)
+}
+rownames(tab) <- rownames(est)
+tab
+summary(umeta[[10]])
+```
+
+```{r}
+## Random effects
+umeta <- list()
+K <- nrow(theta)
+tab2 <- NULL
+for (i in 1:K) {
+  umeta[[i]] <- mvmeta(theta[i,]~1, S=var[i,], method="reml")
+  out <- summary(umeta[[i]])$coef[,c(1,2,4)]
+  tab2 <- rbind(tab2, out)
+}
+rownames(tab2) <- rownames(est)
+tab2
+summary(umeta[[10]])
+```
+
+```{r}
+est4 <- tab[,c(1,2)]
+est5 <- tab2[,c(1,2)]
+est <- cbind(est, est4, est5)
+```
+
+```{r}
+colnames(est) <- c("Wave1 Est", "Wave1 Std.Error","Wave2 Est", "Wave2 Std.Error", "Wave3 Est", "Wave3 Std.Error", "Fixed Est", "Fixed Std.Error", "Random Est", "Random Std.Error")
+```
+
+```{r}
+est
+```
+
+The SAOM approach focuses more on characterizing how does the network dynamics and behavior dynamics change before and after the behavior occurred. 
+
+While meta regression approach focuses more on comparing the effects of fixed and random network behavior in influencing the popularity of drinkers.

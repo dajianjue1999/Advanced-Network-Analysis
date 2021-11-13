@@ -1,0 +1,111 @@
+---
+title: "QTM385-4Homework2"
+author: "Daoyang E"
+date: "9/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE)
+```
+
+```{r, include=FALSE}
+library(statnet)
+```
+
+```{r}
+data <- read.csv("Manager_advice.csv", header = T)
+```
+
+```{r}
+Fnet <- network(data, directed = T)
+```
+
+
+### 1
+```{r}
+plot.network(Fnet, displaylabels = T, boxed.labels = FALSE, vertex.cex = 0.6, label.cex = 1, 
+             label.col = "blue", edge.lwd = .5, edge.col = "gray50")
+```
+### 2
+
+```{r}
+#node level
+degree <- degree(Fnet)
+ind <- degree(Fnet, cmode = "indegree")
+out <- degree(Fnet, cmode = "outdegree")
+```
+
+```{r}
+#closeness
+closeness <- closeness(Fnet, cmode="suminvdir")
+```
+
+```{r}
+#betweenness
+betweenness <- betweenness(Fnet)
+```
+
+```{r}
+#eigenvector centrality
+ecent <- evcent(Fnet)
+```
+
+```{r}
+tab1 <- cbind(degree, closeness, betweenness, ecent)
+#table showing degree closeness betweenness and eigenvector centrality
+tab1
+```
+
+### 3
+
+```{r}
+dyad.census(Fnet)
+```
+
+```{r}
+# proportion of mutual ties
+(reciprocity <- grecip(Fnet))
+```
+
+### 4
+
+```{r}
+clique <- clique.census(Fnet)
+#clique of size 3
+clique$cliques[3]
+#clique of size 4
+clique$cliques[4]
+```
+
+### 5
+
+```{r}
+# density
+density <- gden(Fnet)
+density
+# centralization
+cent <- centralization(Fnet, degree)
+cent
+# transivity
+transitivity <- gtrans(Fnet)
+transitivity
+```
+
+Looking at these values, I will first start analyzing degree, betweenness, closeness and eigenvector centrality.
+
+Degree centrality is defined as the number of links incident upon a node. We see that these 21 managers are relating to each other in a rather large degree.
+
+Betweenness centrality measures the number of times a node lies on the shortest path between other nodes. We see that manager 1,4,7,10,18,21 is likely to be the bridges between nodes in this network. Manager 18 and 21 looks like to be manager who holds authority over disparate clusters in this network
+
+Closeness centrality scores each node based on their ‘closeness’ to all other nodes in the network. The closeness centrality for these 21 managers are relatively small, which indicates that this is a highly-connected network.
+
+Eigen-Centrality measures a node’s influence based on the number of links it has to other nodes in the network. EigenCentrality then goes a step further by also taking into account how well connected a node is, and how many links their connections have, and so on through the network. In this example, manager 15 and 18 exhibit relatively high eigenvector centrality, which means that they have higher influence over the whole network.
+
+The proportion of mutual ties is close to 50%, which is in accordance with what I read in the readings, since this means assymetric ties counts for the other half of the ties.
+
+The cliques with three or more clique member show manager 18 to be a key manager in these cliques, manager 18 is present in more than half of these cliques.
+
+At last, I analyze density, centralization and transitivity. The density factor shows that about the number of connections in this network is half the maximum number of connections. The centralization factor is about 0.35, which means that the network has rather small number of inequality. The transitivity factor indicates that the proportion of transitive triads out of all possible triads in about 0.67.
+
+Overall, I could conclude that this network is a highly-connected and equal network, with several manager serving as the bridge and manager 18 exhibits to be the most influential manager.

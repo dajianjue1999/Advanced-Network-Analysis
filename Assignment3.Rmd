@@ -1,0 +1,72 @@
+---
+title: "QTM385-4Assignment3"
+author: "Daoyang E"
+date: "9/22/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(statnet)
+```
+
+```{r}
+data <- read.csv("Manager_advice.csv", header = T)
+att <- read.csv("Manager_att.csv", header = T, row.names = 1 )
+friendship <- read.csv("Manager_friends.csv", header = T)
+```
+
+```{r}
+Anet <- network(data, directed = T)
+fnet <- network(friendship, directed = T)
+set.vertex.attribute( Anet, "age", att$age )
+set.vertex.attribute( Anet, "tenure", att$tenure )
+set.vertex.attribute( Anet, "level", att$level )
+set.vertex.attribute( Anet, "dept", att$dept )
+```
+
+```{r}
+Anet
+```
+
+### Q1
+
+```{r}
+model1 <- ergm(Anet ~ edges + nodeicov("age") + nodeocov("age") + nodecov("tenure") + 
+                nodefactor("dept") + absdiff("age") + absdiff("tenure") + nodematch("dept"), estimate = "MPLE")
+summary(model1)
+```
+
+### Q2
+
+```{r}
+model2 <- ergm(Anet ~ edges + nodecov("age") +nodefactor("level") + nodecov("tenure") + nodefactor("dept") + absdiff("age") + absdiff("tenure") + nodematch("dept")+nodematch("level")+ mutual + gwidegree(0.1, fixed = TRUE) + gwesp(0.1, fixed = TRUE)+gwdsp(0.1, fixed = TRUE), estimate = "MPLE",control = control.ergm(MCMLE.maxit = 500, MCMC.burnin=10000, MCMC.interval=200, seed = 2))
+summary(model2)
+```
+
+### Q3
+
+```{r}
+model3 <- ergm(Anet ~ edges + nodecov("age") + nodefactor("level") + nodecov("tenure") +
+                 nodefactor("dept") + absdiff("age") + absdiff("tenure") + nodematch("dept")+ nodematch("level")+
+                 mutual + gwidegree(0.1, fixed = TRUE) + gwesp(0.1, fixed = TRUE) + gwdsp(0.1, fixed = TRUE) +
+                 edgecov(fnet), estimate = "MPLE", control = control.ergm(MCMLE.maxit = 300, MCMC.burnin=10000, MCMC.interval=200, seed = 2 ))
+summary(model3)
+```
+
+### Q4
+
+```{r}
+AIC <- rbind(AIC(model1), AIC(model2), AIC(model3))
+AIC
+```
+
+```{r}
+gof2 <- gof(model2)
+par(mfrow=c(1,5))
+plot(gof2)
+```
+
+The goodness-of-fit test indicates a result that although my model shows general convergence and performs relatively well for in degree, out degree and minimum geodesic distances, my model did not capture most of the features of the edge-wise shared partners, which is an indication that I need to further improve my model to fit the simulated model with the observed values.
+
+The results of the ERGM indicates that level covariate effect and department covariate effect has relative strong influence on advice seeking behavior, same as homophily effect for level and department. Oppositely, age and tenure show little covariate effect and homophily effects in influencing advice seeking ties. There is indication that recicprocity and preferential attachment has positive influence on advice seeking ties, but considering reciprocity, the relation is negative.
