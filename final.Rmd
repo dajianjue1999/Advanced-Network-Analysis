@@ -1,6 +1,6 @@
 ---
-title: "Senate"
-author: "Daoyang E"
+title: "Final Project"
+author: "Group 3"
 date: "11/13/2021"
 output: html_document
 ---
